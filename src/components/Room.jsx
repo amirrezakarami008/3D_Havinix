@@ -1,8 +1,10 @@
-import * as THREE from 'three'
 import { ROOM_DEPTH, ROOM_HEIGHT, ROOM_WIDTH } from '../constants/roomDimensions'
 import { Wall } from './Wall'
 import { Floor } from './Floor'
 import { Rug } from './Rug'
+import { Sofa } from './Sofa'
+import { CoffeeTable } from './CoffeeTable'
+import { FloorLamp } from './FloorLamp'
 
 const hw = ROOM_WIDTH / 2
 const hd = ROOM_DEPTH / 2
@@ -22,38 +24,15 @@ function WindowPanel() {
   )
 }
 
+/** Living layout only; furniture is separate components. */
 function LivingRoomFurniture() {
-  const fabric = '#2a2d32'
-  const wood = '#5c4636'
+  const tableZ = 0.72
 
   return (
     <group>
-      <mesh position={[0, 0.21, -hd + 0.62]} castShadow receiveShadow>
-        <boxGeometry args={[2.15, 0.42, 0.92]} />
-        <meshStandardMaterial color={fabric} roughness={0.95} metalness={0.02} />
-      </mesh>
-      <mesh position={[0, 0.62, -hd + 0.62]} castShadow receiveShadow>
-        <boxGeometry args={[2.15, 0.78, 0.12]} />
-        <meshStandardMaterial color={fabric} roughness={0.94} metalness={0.02} />
-      </mesh>
-      <mesh position={[0, 0.25, -0.35]} castShadow receiveShadow>
-        <boxGeometry args={[0.95, 0.38, 0.52]} />
-        <meshStandardMaterial color={wood} roughness={0.72} metalness={0.06} />
-      </mesh>
-      <mesh position={[-hw + 0.22, 0.55, 0.15]} castShadow receiveShadow>
-        <boxGeometry args={[0.08, 1.05, 0.08]} />
-        <meshStandardMaterial color="#3a3a3a" roughness={0.55} metalness={0.35} />
-      </mesh>
-      <mesh position={[-hw + 0.22, 1.08, 0.15]} castShadow>
-        <sphereGeometry args={[0.16, 24, 24]} />
-        <meshStandardMaterial
-          color="#f6f2e6"
-          emissive="#ffe8c8"
-          emissiveIntensity={0.55}
-          roughness={0.45}
-          metalness={0}
-        />
-      </mesh>
+      <Sofa position={[0, 0, 0]} />
+      <CoffeeTable position={[0, 0, tableZ]} />
+      <FloorLamp position={[-hw + 0.22, 0, 0.15]} />
     </group>
   )
 }

@@ -40,7 +40,7 @@ function SunLight() {
       ref={ref}
       castShadow
       position={[4.8, 3.1, -2.1]}
-      intensity={1.25}
+      intensity={1.12}
       color="#fff4e6"
     />
   )
@@ -50,10 +50,10 @@ function Scene({ wallColor, floorMaterial, rugImageUrl }) {
   return (
     <>
       <color attach="background" args={[CAMERA_BG]} />
-      <hemisphereLight args={['#eef1f5', '#9d9792']} intensity={0.55} />
-      <ambientLight intensity={0.22} color="#f4f4f4" />
+      <hemisphereLight args={['#eef1f5', '#9d9792']} intensity={0.62} />
+      <ambientLight intensity={0.32} color="#f4f4f4" />
       <SunLight />
-      <directionalLight position={[-3.2, 1.6, 2.4]} intensity={0.28} color="#d8e6ff" />
+      <directionalLight position={[-3.2, 1.6, 2.4]} intensity={0.38} color="#d8e6ff" />
 
       <Room wallColor={wallColor} floorMaterial={floorMaterial} rugImageUrl={rugImageUrl} />
 

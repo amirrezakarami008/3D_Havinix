@@ -1,8 +1,7 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
 import { useTexture } from '@react-three/drei'
-
-const RUG_LIFT = 0.004
+import { RUG_SURFACE_Y } from '../constants/roomDimensions'
 
 function configureRugTexture(t) {
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping
@@ -10,7 +9,7 @@ function configureRugTexture(t) {
   t.anisotropy = 8
 }
 
-export function Rug({ imageUrl, maxWidth = 2.35, position = [0, RUG_LIFT, 0.2] }) {
+export function Rug({ imageUrl, maxWidth = 2.35, position = [0, RUG_SURFACE_Y, 0.2] }) {
   const texture = useTexture(imageUrl, configureRugTexture)
 
   const { planeW, planeH } = useMemo(() => {

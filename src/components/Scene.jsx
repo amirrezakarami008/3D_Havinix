@@ -6,20 +6,6 @@ import { ApartmentTemplate } from './ApartmentTemplate'
 import { ROOM_DEPTH, ROOM_WIDTH } from '../constants/roomDimensions'
 import { RoomLights } from './RoomLights'
 
-const SCENE_STYLING = {
-  wallColor: '#f2ece3',
-  floorVisible: true,
-  rugVisible: true,
-  floorTint: '#faf6f0',
-}
-
-const SECOND_PLACE_STYLING = {
-  wallColor: '#e7edf7',
-  floorVisible: true,
-  rugVisible: true,
-  floorTint: '#f8faff',
-}
-
 const EYE_HEIGHT = 1.62
 const MOVE_SPEED = 2.2
 const ROOM_MARGIN = 0.36
@@ -198,8 +184,7 @@ function WalkAndInspectControls({ onDoorProximityChange, onDoorInteract, place }
   )
 }
 
-export function Scene({ place = 'home', onDoorProximityChange, onDoorInteract }) {
-  const sceneStyling = place === 'home' ? SCENE_STYLING : SECOND_PLACE_STYLING
+export function Scene({ place = 'home', roomConfig, onDoorProximityChange, onDoorInteract }) {
   const isSecondPlace = place === 'building2'
 
   return (
@@ -207,7 +192,7 @@ export function Scene({ place = 'home', onDoorProximityChange, onDoorInteract })
       <color attach="background" args={[isSecondPlace ? '#edf5ff' : '#d9dde4']} />
       <fog attach="fog" args={[isSecondPlace ? '#edf5ff' : '#d9dde4', 9, 24]} />
       <RoomLights place={place} />
-      <ApartmentTemplate {...sceneStyling} />
+      <ApartmentTemplate roomConfig={roomConfig} />
       <group position={[0, 0.94, ROOM_DEPTH / 2 - 0.03]}>
         <mesh>
           <planeGeometry args={[0.95, 1.85]} />

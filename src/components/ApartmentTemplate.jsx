@@ -1,33 +1,178 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 
 const GLB_PATH = '/src/template/sydney_apartment_night_-_custom_home.glb'
 
-function isWallObject(name) {
-  return /wall|chimney|brick/i.test(name)
+function makeCheckerTexture({
+  size = 512,
+  cell = 32,
+  base = '#cfc4b6',
+  accent = '#baa78f',
+  alpha = 0.22,
+} = {}) {
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+
+  ctx.fillStyle = base
+  ctx.fillRect(0, 0, size, size)
+
+  for (let y = 0; y < size; y += cell) {
+    for (let x = 0; x < size; x += cell) {
+      if (((x / cell) + (y / cell)) % 2 !== 0) continue
+      ctx.fillStyle = accent
+      ctx.globalAlpha = alpha
+      ctx.fillRect(x, y, cell, cell)
+    }
+  }
+  ctx.globalAlpha = 1
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.needsUpdate = true
+  return texture
 }
 
-function isFloorObject(name) {
-  return /floor|plane/i.test(name)
+function makeNoiseTexture({
+  size = 512,
+  base = '#e5e5e5',
+  noise = '#9ba3ad',
+  strength = 0.13,
+} = {}) {
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+
+  ctx.fillStyle = base
+  ctx.fillRect(0, 0, size, size)
+
+  for (let i = 0; i < size * 1.8; i += 1) {
+    const x = Math.random() * size
+    const y = Math.random() * size
+    const radius = 0.7 + Math.random() * 1.6
+    ctx.beginPath()
+    ctx.arc(x, y, radius, 0, Math.PI * 2)
+    ctx.fillStyle = noise
+    ctx.globalAlpha = Math.random() * strength
+    ctx.fill()
+  }
+  ctx.globalAlpha = 1
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.needsUpdate = true
+  return texture
 }
 
-function isRugObject(name) {
-  return /rug|carpet/i.test(name)
+function makeWoodTexture({ size = 512 } = {}) {
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+
+  const gradient = ctx.createLinearGradient(0, 0, size, 0)
+  gradient.addColorStop(0, '#b18358')
+  gradient.addColorStop(0.5, '#9e754e')
+  gradient.addColorStop(1, '#7d5939')
+  ctx.fillStyle = gradient
+  ctx.fillRect(0, 0, size, size)
+
+  for (let i = 0; i < 70; i += 1) {
+    const y = Math.random() * size
+    ctx.beginPath()
+    ctx.moveTo(0, y)
+    ctx.bezierCurveTo(size * 0.25, y + Math.random() * 8, size * 0.75, y - Math.random() * 8, size, y)
+    ctx.strokeStyle = `rgba(65, 41, 24, ${0.05 + Math.random() * 0.08})`
+    ctx.lineWidth = 1 + Math.random() * 1.8
+    ctx.stroke()
+  }
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.needsUpdate = true
+  return texture
 }
 
-export function ApartmentTemplate({
-  wallColor = '#ebe8e3',
-  floorVisible = true,
-  rugVisible = true,
-  floorTint = '#ffffff',
-}) {
+function classifyMesh(name) {
+  if (!name) return 'static'
+  const staticMesh = /ceiling|roof|door|frame|window|stairs|railing|column|beam/i.test(name)
+  if (staticMesh) return 'static'
+  if (/sofa|couch|armchair|loveseat|settee/i.test(name)) return 'sofa'
+  if (/bath|bathroom|toilet|sink|shower|wc/i.test(name)) return 'bathroom'
+  if (/wall|chimney|brick|paint|plaster/i.test(name)) return 'wall'
+  if (/floor|ground|plane/i.test(name)) return 'floor'
+  if (/tile/i.test(name)) return 'bathroom'
+  return 'static'
+}
+
+function applyTiling(texture, repeatX, repeatY) {
+  if (!texture) return
+  texture.repeat.set(repeatX, repeatY)
+  texture.needsUpdate = true
+}
+
+const WALL_TEXTURES = {
+  none: null,
+  plaster: makeNoiseTexture({
+    base: '#f2eee8',
+    noise: '#dcd2c7',
+    strength: 0.18,
+  }),
+}
+
+const FLOOR_TEXTURES = {
+  tile: makeCheckerTexture({
+    base: '#c5b39f',
+    accent: '#aa947f',
+    cell: 52,
+    alpha: 0.28,
+  }),
+  wood: makeWoodTexture(),
+  stone: makeNoiseTexture({
+    base: '#b9bcc1',
+    noise: '#767f8a',
+    strength: 0.2,
+  }),
+}
+
+const BATHROOM_TILE_TEXTURE = makeCheckerTexture({
+  base: '#9cb1c8',
+  accent: '#8499af',
+  cell: 22,
+  alpha: 0.35,
+})
+
+const CONTROLLED_MATERIALS = {
+  wall: new THREE.MeshStandardMaterial({ color: '#ece5dc', roughness: 0.88, metalness: 0.02 }),
+  floor: new THREE.MeshStandardMaterial({ color: '#d9ccbf', roughness: 0.82, metalness: 0.05 }),
+  sofa: new THREE.MeshStandardMaterial({ color: '#8f9cab', roughness: 0.72, metalness: 0.04 }),
+  bathroom: new THREE.MeshStandardMaterial({
+    color: '#a9bed5',
+    roughness: 0.96,
+    metalness: 0.02,
+    emissive: '#6f8aa5',
+    emissiveIntensity: 0.08,
+  }),
+}
+
+export function ApartmentTemplate({ roomConfig }) {
   const { scene } = useGLTF(GLB_PATH)
   const sceneClone = useMemo(() => scene.clone(true), [scene])
+  const meshGroupsRef = useRef({
+    wall: [],
+    floor: [],
+    sofa: [],
+    bathroom: [],
+  })
 
   useEffect(() => {
     sceneClone.updateMatrixWorld(true)
-    let hasRugMesh = false
 
     sceneClone.traverse((obj) => {
       if (obj.isLight) {
@@ -36,50 +181,47 @@ export function ApartmentTemplate({
       }
       if (!obj.isMesh) return
 
-      const meshName = obj.parent?.name || obj.name || ''
+      const meshName = `${obj.parent?.name || ''} ${obj.name || ''}`.trim()
       const lowerName = meshName.toLowerCase()
-      const mat = obj.material
+      const targetGroup = classifyMesh(lowerName)
 
       obj.frustumCulled = true
       obj.receiveShadow = !/smalldecor|photos|book|chess/i.test(lowerName)
       obj.castShadow = !/wallsnew|floor_new|plane001|blinds|curtain/i.test(lowerName)
+      if (targetGroup === 'static') return
 
-      if (!mat) return
-      if (Array.isArray(mat)) return
-      if (!obj.userData.materialIsCloned) {
-        obj.material = mat.clone()
-        obj.userData.materialIsCloned = true
-      }
-      if (!obj.userData.baseColor && obj.material.color) {
-        obj.userData.baseColor = obj.material.color.clone()
-      }
-      const baseColor = obj.userData.baseColor
-
-      if (isWallObject(lowerName) && obj.material.color && baseColor) {
-        obj.material.color.copy(baseColor).multiply(new THREE.Color(wallColor))
-      }
-
-      if (isFloorObject(lowerName)) {
-        obj.visible = floorVisible
-        if (obj.material.color && baseColor) {
-          obj.material.color.copy(baseColor).multiply(new THREE.Color(floorTint))
-        }
-      }
-
-      if (isRugObject(lowerName)) {
-        hasRugMesh = true
-        obj.visible = rugVisible
-      }
+      meshGroupsRef.current[targetGroup].push(obj)
+      obj.material = CONTROLLED_MATERIALS[targetGroup]
     })
+  }, [sceneClone])
 
-    // This GLB has no explicit "rug" node names, so we keep a safe fallback target.
-    if (!hasRugMesh) {
-      const fallbackRug = sceneClone.getObjectByName('Plane001_21')
-      if (fallbackRug) {
-        fallbackRug.visible = rugVisible
-      }
-    }
-  }, [sceneClone, wallColor, floorVisible, rugVisible, floorTint])
+  useEffect(() => {
+    const wallMaterial = CONTROLLED_MATERIALS.wall
+    wallMaterial.color.set(roomConfig.wall.color)
+    wallMaterial.map = WALL_TEXTURES[roomConfig.wall.textureKey] ?? null
+    applyTiling(wallMaterial.map, 2, 2)
+    wallMaterial.needsUpdate = true
+  }, [roomConfig.wall.color, roomConfig.wall.textureKey])
+
+  useEffect(() => {
+    const floorMaterial = CONTROLLED_MATERIALS.floor
+    floorMaterial.map = FLOOR_TEXTURES[roomConfig.floor.textureKey] ?? FLOOR_TEXTURES.tile
+    applyTiling(floorMaterial.map, 3, 3)
+    floorMaterial.needsUpdate = true
+  }, [roomConfig.floor.textureKey])
+
+  useEffect(() => {
+    const sofaMaterial = CONTROLLED_MATERIALS.sofa
+    sofaMaterial.color.set(roomConfig.sofa.color)
+    sofaMaterial.needsUpdate = true
+  }, [roomConfig.sofa.color])
+
+  useEffect(() => {
+    const bathroomMaterial = CONTROLLED_MATERIALS.bathroom
+    bathroomMaterial.map = BATHROOM_TILE_TEXTURE
+    applyTiling(bathroomMaterial.map, 4, 4)
+    bathroomMaterial.needsUpdate = true
+  }, [])
 
   return <primitive object={sceneClone} />
 }

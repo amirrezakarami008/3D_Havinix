@@ -1,147 +1,208 @@
 # 3D_Havinix
 
-This repository is a React + Vite + React Three Fiber living-room scene prototype.
+پروژه `3D_Havinix` یک نمونه تعاملی سه‌بعدی با `React + Vite + React Three Fiber` است که در حال حاضر یک محیط داخلی قابل حرکت، قابل تعامل و دارای انتقال بین دو ساختمان را پیاده‌سازی کرده است.
 
-## 1) Current State of the Project
+---
 
-### Implemented so far
-- Single-page React app rendering a 3D interior scene in a `Canvas`.
-- Componentized room shell: `Room`, `Floor`, `Wall`, `Rug`, `Sofa`, `CoffeeTable`, `FloorLamp`.
-- Basic UI controls for:
-  - wall color preset
-  - floor material mode (`wood` / `tile`)
-  - rug image selection
-- Orbit camera controls with constrained rotation and zoom.
-- Shadow-enabled lighting and mesh shadow flags on scene objects.
+## هدف وضعیت فعلی پروژه
 
-### What works visually and functionally
-- The room geometry is present: floor, four walls, and a ceiling plane.
-- Furniture layout is visible: sofa, coffee table, and floor lamp.
-- Wall color dropdown updates wall material color in real time.
-- Floor material dropdown switches floor material settings and map key.
-- Rug option dropdown switches rug texture URL.
-- Sofa GLB model loads from `public/models/sofa.glb`.
+هدف فعلی، ساخت یک تجربه قابل بازی (Interactive Walkthrough) است که کاربر بتواند:
 
-### Placeholder / temporary elements
-- Window is a single emissive plane (`WindowPanel`), not an opening or physically correct glazing setup.
-- Coffee table and floor lamp are primitive geometry approximations, not authored assets.
-- Lighting is handcrafted and stylized, not physically calibrated.
-- App-level controls are simple HTML selects without domain validation or persistence.
+- داخل محیط حرکت کند (حالت اول‌شخص)
+- روی اشیاء زوم کند
+- نزدیک در، تعامل انجام دهد
+- بین دو ساختمان جابه‌جا شود
+- تفاوت بصری ساختمان دوم را مخصوصا در نورپردازی حس کند
 
-## 2) Tech Stack
+این README وضعیت واقعی پروژه را تا همین مرحله مستندسازی می‌کند.
 
-### Frameworks and libraries
-- `react` + `react-dom` for UI and state.
-- `vite` for dev server and bundling.
-- `three` as rendering/math engine.
-- `@react-three/fiber` (R3F) for Three.js scene integration in React.
-- `@react-three/drei` for helpers (`OrbitControls`, `useGLTF`, `useTexture`, `RoundedBox`).
+---
 
-### Asset formats in use
-- `GLB` model: sofa at `public/models/sofa.glb`.
-- Texture image paths are referenced as JPEG URLs under `/textures/*.jpg`.
+## تکنولوژی‌ها
 
-### Important dependencies / assumptions
-- Scene assumes `1 world unit = 1 meter` (`roomDimensions.js`).
-- Texture-loading code assumes these files exist:
-  - `/textures/wood.jpg`
-  - `/textures/tile.jpg`
-  - `/textures/rug1.jpg`
-  - `/textures/rug2.jpg`
-- These texture files are currently not present in `public`, so texture-dependent materials are currently unresolved.
-- `@dnd-kit/utilities` is installed but not used in the current scene code.
+- `react` / `react-dom`
+- `vite`
+- `three`
+- `@react-three/fiber`
+- `@react-three/drei`
 
-## 3) Scene Structure
+### اجزای مهم مورد استفاده از drei
 
-Current hierarchy (logical):
-- `App`
-  - top control panel (HTML/CSS)
-  - `Canvas`
-    - scene background color
-    - lights (`hemisphere`, `ambient`, two `directional`, one with custom shadow camera)
-    - `Room`
-      - `Floor`
-      - `Rug`
-      - 4x `Wall`
-      - ceiling mesh (inline, not separate component)
-      - `WindowPanel` (inline helper in `Room`)
-      - furniture group (`LivingRoomFurniture`, inline helper in `Room`)
-        - `Sofa`
-        - `CoffeeTable`
-        - `FloorLamp`
-    - `OrbitControls`
+- `OrbitControls`
+- `PointerLockControls`
+- `KeyboardControls`
+- `useGLTF`
+- `RoundedBox`
 
-Componentization status:
-- Componentized: floor, rug, walls, sofa, coffee table, floor lamp, room wrapper.
-- Not componentized (inline in parent files): sun light setup, secondary directional light, ceiling mesh, window panel, furniture layout grouping.
+---
 
-## 4) Furniture & Assets
+## ساختار کلی پروژه
 
-### Existing objects
-- Sofa: GLB model (`Sofa` component).
-- Coffee table: primitive geometry (`RoundedBox` top + box legs).
-- Floor lamp: primitive geometry (box pole + sphere shade).
-- Room shell: primitive planes (floor, walls, ceiling).
-- Rug: textured plane.
+### ساختار پوشه‌های مهم
 
-### Primitive vs model
-- GLB model: sofa only.
-- Primitive meshes: walls, floor, ceiling, rug mesh, table, lamp, window panel.
+- `src/App.jsx`  
+  نقطه اصلی اپلیکیشن، تعریف `Canvas`، مدیریت state انتقال بین ساختمان‌ها، نمایش دکمه تعامل در
 
-### Model/asset loading paths
-- GLB:
-  - `/models/sofa.glb` (exists in `public/models/sofa.glb`)
-- Referenced textures:
-  - `/textures/wood.jpg` (missing)
-  - `/textures/tile.jpg` (missing)
-  - `/textures/rug1.jpg` (missing)
-  - `/textures/rug2.jpg` (missing)
+- `src/components/Scene.jsx`  
+  صحنه اصلی سه‌بعدی، کنترل‌های دوربین/حرکت، تشخیص نزدیکی در، زوم روی آبجکت‌ها، مارکر در
 
-## 5) Lighting & Camera
+- `src/components/RoomLights.jsx`  
+  نورپردازی صحنه با preset متفاوت برای `home` و `building2`
 
-### Lighting setup
-- `hemisphereLight` for broad sky/ground fill.
-- `ambientLight` for global base illumination.
-- Main shadow-casting `directionalLight` ("sun") with tuned shadow map/camera bounds.
-- Secondary directional fill light for color contrast.
-- Lighting is non-PBR-calibrated and tuned for preview readability rather than photorealism.
+- `src/components/ApartmentTemplate.jsx`  
+  بارگذاری و نمایش مدل اصلی خانه (`GLB`) و اعمال tintهای متریال
 
-### Camera and controls
-- Perspective camera configured in `Canvas` (`fov`, near/far, initial position).
-- `OrbitControls` enabled with damping.
-- Interaction constraints:
-  - clamped vertical orbit (`minPolarAngle`, `maxPolarAngle`)
-  - clamped horizontal orbit (`minAzimuthAngle`, `maxAzimuthAngle`)
-  - clamped zoom distance (`minDistance`, `maxDistance`)
-- No collision checks, no first-person mode, and no saved viewpoints.
+- `src/constants/roomDimensions.js`  
+  ابعاد پایه فضا (متر) و ثابت‌های مرتبط
 
-## 6) Performance Status
+---
 
-### Current concerns
-- Missing textures can trigger asset-load errors/retries and unstable material state.
-- Shadow map size is set to `2048x2048`; acceptable for a simple scene but can be expensive on low-end GPUs.
-- Multiple dynamic lights plus shadow casting on many meshes increases fragment/shadow cost.
-- No explicit performance instrumentation (FPS budgeting, regression checks, or device profiling) is present.
+## قابلیت‌های پیاده‌سازی شده
 
-### Optimizations already applied
-- GLTF preload call (`useGLTF.preload`) for sofa.
-- Sofa scene is cloned once via `useMemo` before placement adjustments.
-- Texture settings configured once per load callback (wrapping, color space, anisotropy).
-- Camera controls are constrained, which limits worst-case overdraw viewpoints.
+## 1) حرکت و کنترل دوربین
 
-## 7) Known Issues / Limitations
+### حالت حرکت اول‌شخص (First-Person)
 
-### Visual issues
-- Floor/rug textures are referenced but not included in repository `public` assets.
-- Window representation is emissive only and does not behave like real exterior lighting.
-- Primitive furniture (lamp/table) has low geometric/material detail.
+- با کلیک روی صحنه، `PointerLockControls` فعال می‌شود.
+- حرکت با کلیدهای `W/A/S/D` یا `Arrow Keys` انجام می‌شود.
+- با `Shift` سرعت حرکت بیشتر می‌شود (run).
+- با `Esc` از حالت قفل ماوس خارج می‌شوید.
 
-### Structural / architectural issues
-- Scene composition is partly split across components and partly inline in `App`/`Room`, which makes hierarchy ownership mixed.
-- Lighting config is embedded in `App` rather than an isolated scene-lighting module.
-- No centralized asset manifest; file paths are hardcoded in components.
+### محدودیت حرکت
 
-### Clearly not final
-- Current UI controls are prototype-level and do not persist or serialize scene state.
-- Materials and lighting values are manually tuned without physically based target references.
-- Scene scope is fixed to one room layout with static furniture positions.
+- حرکت کاربر در محدوده اتاق clamp می‌شود تا از محیط خارج نشود.
+- ارتفاع دوربین روی ارتفاع چشم (`EYE_HEIGHT`) ثابت نگه داشته می‌شود.
+
+### حالت مشاهده آزاد
+
+- وقتی pointer lock غیرفعال است، `OrbitControls` فعال است.
+- امکان چرخش و zoom کنترل‌شده برای مشاهده صحنه وجود دارد.
+
+---
+
+## 2) زوم روی اشیاء
+
+- در حالت غیر lock، با `double click` روی هر `mesh`، دوربین به‌صورت نرم به سمت همان شی فوکوس می‌کند.
+- نقطه هدف زوم با `Box3` از خود آبجکت محاسبه می‌شود تا زوم برای اشیاء مختلف درست عمل کند.
+
+---
+
+## 3) تعامل با در و انتقال بین ساختمان‌ها
+
+### تشخیص نزدیکی در
+
+- سیستم proximity نزدیک در بر اساس فاصله افقی `XZ` پیاده‌سازی شده است (نه فاصله سه‌بعدی کامل).
+- چند نقطه برای موقعیت در تعریف شده تا تشخیص پایدارتر باشد.
+- شعاع تشخیص افزایش یافته تا کاربر راحت‌تر trigger را فعال کند.
+
+### UI تعامل
+
+- وقتی کاربر نزدیک در باشد، یک دکمه روی صفحه نمایش داده می‌شود:
+  - ورود به ساختمان دوم
+  - یا بازگشت به خانه اصلی
+- متن راهنما (`یا کلید E رو بزن`) هم نمایش داده می‌شود.
+
+### راه‌های تعامل
+
+- کلیک روی دکمه UI
+- یا کلید `E`
+
+### تغییر صحنه
+
+- state `currentPlace` بین `home` و `building2` سوییچ می‌شود.
+- بعد از انتقال، موقعیت دوربین reset می‌شود تا تجربه پایدار بماند.
+
+---
+
+## 4) نورپردازی
+
+نورپردازی الان لایه‌ای است و برای دو ساختمان preset جدا دارد.
+
+### در حالت `home`
+
+- نور محیطی ملایم
+- hemisphere light متعادل
+- directional key light گرم
+- directional fill light ضعیف
+- spot light سقفی با شدت متوسط
+
+### در حالت `building2`
+
+- نور محیطی و hemisphere به‌صورت محسوس قوی‌تر شده‌اند.
+- key/fill light شدت بیشتری دارند.
+- spot light سقفی شدت و برد بیشتری دارد.
+- رنگ background/fog روشن‌تر شده تا حس «فضای دیگر» واضح باشد.
+
+---
+
+## 5) نشانگر بصری در
+
+برای اینکه پیدا کردن محل تعامل با در راحت باشد:
+
+- یک پنل شفاف emissive جلوی در اضافه شده
+- یک ring در محل در قرار گرفته
+
+این نشانگر کمک می‌کند کاربر بداند دقیقا کجا باید نزدیک شود.
+
+---
+
+## مسیر اجرای پروژه
+
+```bash
+npm install
+npm run dev
+```
+
+آدرس پیش‌فرض توسعه:
+
+- `http://localhost:5173`
+
+نسخه production:
+
+```bash
+npm run build
+npm run preview
+```
+
+---
+
+## کنترل‌های کاربر (Quick Reference)
+
+- `W/A/S/D` یا `Arrow Keys`: حرکت
+- `Shift`: حرکت سریع
+- کلیک روی صحنه: فعال‌سازی حالت اول‌شخص
+- `Esc`: خروج از حالت اول‌شخص
+- `Double Click` روی آبجکت: زوم/فوکوس روی آبجکت
+- نزدیک در + کلیک دکمه یا `E`: انتقال به ساختمان دیگر
+
+---
+
+## وضعیت کیفیت و تست
+
+- پروژه با `vite build` بدون خطا build می‌شود.
+- lint برای فایل‌های تغییریافته بدون خطا بوده است.
+
+---
+
+## محدودیت‌های فعلی
+
+- ساختمان دوم فعلا از همان template اصلی استفاده می‌کند و بیشتر تفاوتش در نور/رنگ است.
+- سیستم collision پیشرفته با مبلمان/دیوار هنوز اضافه نشده (حرکت clamp سطحی دارد).
+- انیمیشن بازشدن در هنوز پیاده‌سازی نشده (انتقال مستقیم است).
+- HDR environment خارجی فعلا استفاده نمی‌شود.
+
+---
+
+## پیشنهادهای مرحله بعد
+
+- ساخت layout یا مدل مستقل برای `building2`
+- اضافه کردن انیمیشن باز شدن در قبل از انتقال
+- افزودن fade transition برای teleport نرم‌تر
+- collision واقعی با دیوار و مبلمان
+- افزودن UI کوچک برای نمایش حالت فعلی (`home` یا `building2`)
+
+---
+
+## جمع‌بندی
+
+تا این مرحله پروژه از یک نمایش ساده 3D به یک تجربه تعاملی قابل حرکت و قابل تعامل تبدیل شده است: کاربر می‌تواند در فضا راه برود، روی اشیاء فوکوس کند، با در تعامل داشته باشد و بین دو فضای متمایز جابه‌جا شود. پایه معماری برای توسعه مراحل بعدی (مدل دوم مستقل، تعاملات بیشتر و گیم‌پلی) آماده است.

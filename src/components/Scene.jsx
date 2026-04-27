@@ -3,12 +3,18 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { ApartmentTemplate } from './ApartmentTemplate'
-import { ROOM_DEPTH, ROOM_WIDTH } from '../constants/roomDimensions'
+import { ROOM_DEPTH } from '../constants/roomDimensions'
 import { RoomLights } from './RoomLights'
 
 const EYE_HEIGHT = 1.62
 const MOVE_SPEED = 2.2
-const ROOM_MARGIN = 0.36
+const ROOM_MARGIN = 0.42
+const INTERIOR_BOUNDS = {
+  minX: -6.19178 + ROOM_MARGIN,
+  maxX: 2.76859 - ROOM_MARGIN,
+  minZ: -4.46592 + ROOM_MARGIN,
+  maxZ: 1.23271 - ROOM_MARGIN,
+}
 const DOOR_RADIUS = 1.35
 const DOOR_POINTS = [
   new THREE.Vector3(1.55, EYE_HEIGHT, ROOM_DEPTH / 2 - 0.48),
@@ -16,7 +22,7 @@ const DOOR_POINTS = [
   new THREE.Vector3(-1.55, EYE_HEIGHT, ROOM_DEPTH / 2 - 0.48),
 ]
 
-function WalkAndInspectControls({ onDoorProximityChange, onDoorInteract, place }) {
+function WalkAndInspectControls({ mode, onDoorProximityChange, onDoorInteract, place }) {
   const { camera, scene, gl } = useThree()
   const [, getKeys] = useKeyboardControls()
   const orbitRef = useRef(null)
@@ -29,15 +35,7 @@ function WalkAndInspectControls({ onDoorProximityChange, onDoorInteract, place }
   const up = useMemo(() => new THREE.Vector3(0, 1, 0), [])
   const raycaster = useMemo(() => new THREE.Raycaster(), [])
   const pointer = useMemo(() => new THREE.Vector2(), [])
-  const bounds = useMemo(
-    () => ({
-      minX: -ROOM_WIDTH / 2 + ROOM_MARGIN,
-      maxX: ROOM_WIDTH / 2 - ROOM_MARGIN,
-      minZ: -ROOM_DEPTH / 2 + ROOM_MARGIN,
-      maxZ: ROOM_DEPTH / 2 - ROOM_MARGIN,
-    }),
-    [],
-  )
+  const bounds = useMemo(() => INTERIOR_BOUNDS, [])
   const transitionRef = useRef(null)
   const nearDoorRef = useRef(false)
   const interactPressedRef = useRef(false)
@@ -106,6 +104,13 @@ function WalkAndInspectControls({ onDoorProximityChange, onDoorInteract, place }
   }, [camera, place])
 
   useEffect(() => () => onDoorProximityChange?.(false), [onDoorProximityChange])
+  useEffect(() => {
+    if (mode !== 'ui') return
+    lockRef.current?.unlock?.()
+    if (document.pointerLockElement) {
+      document.exitPointerLock?.()
+    }
+  }, [mode])
 
   useFrame((_, delta) => {
     const isNearDoor = DOOR_POINTS.some((doorPoint) => {
@@ -116,6 +121,10 @@ function WalkAndInspectControls({ onDoorProximityChange, onDoorInteract, place }
     if (isNearDoor !== nearDoorRef.current) {
       nearDoorRef.current = isNearDoor
       onDoorProximityChange?.(isNearDoor)
+    }
+
+    if (mode === 'ui') {
+      return
     }
 
     if (!isLocked) {
@@ -167,11 +176,11 @@ function WalkAndInspectControls({ onDoorProximityChange, onDoorInteract, place }
 
   return (
     <>
-      <PointerLockControls ref={lockRef} selector=".canvas-wrap" />
+      <PointerLockControls ref={lockRef} selector=".canvas-wrap" enabled={mode === 'fps'} />
       <OrbitControls
         ref={orbitRef}
         makeDefault
-        enabled={!isLocked}
+        enabled={mode === 'fps' && !isLocked}
         enableDamping
         dampingFactor={0.08}
         target={[0.05, 1.35, 0.3]}
@@ -184,7 +193,7 @@ function WalkAndInspectControls({ onDoorProximityChange, onDoorInteract, place }
   )
 }
 
-export function Scene({ place = 'home', roomConfig, onDoorProximityChange, onDoorInteract }) {
+export function Scene({ place = 'home', roomConfig, mode, onDoorProximityChange, onDoorInteract }) {
   const isSecondPlace = place === 'building2'
 
   return (
@@ -210,6 +219,7 @@ export function Scene({ place = 'home', roomConfig, onDoorProximityChange, onDoo
         </mesh>
       </group>
       <WalkAndInspectControls
+        mode={mode}
         onDoorProximityChange={onDoorProximityChange}
         onDoorInteract={onDoorInteract}
         place={place}

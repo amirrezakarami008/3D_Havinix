@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 
-export function RoomLights({ place = 'home' }) {
+export function RoomLights({ place = 'home', mainLightIntensityFactor = 1 }) {
   const keyLight = useRef(null)
   const ceilingSpot = useRef(null)
   const isSecondPlace = place === 'building2'
@@ -41,7 +41,7 @@ export function RoomLights({ place = 'home' }) {
         ref={keyLight}
         castShadow
         position={[3.4, 3.6, 2.2]}
-        intensity={isSecondPlace ? 2.05 : 1.28}
+        intensity={(isSecondPlace ? 2.05 : 1.28) * mainLightIntensityFactor}
         color={isSecondPlace ? '#fff8ef' : '#fff2df'}
       />
       <directionalLight

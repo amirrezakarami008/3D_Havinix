@@ -1,10 +1,30 @@
+/* eslint-disable react-hooks/immutability --
+ * @react-three/fiber useFrame and Three.js camera/vector mutations are intentional here.
+ */
 import { OrbitControls, PointerLockControls, useKeyboardControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import {
+  DEFAULT_FLOOR_MATERIAL_KEY,
+  FLOOR_PRESETS,
+} from '../materials/floorMaterials'
+import {
+  DEFAULT_WALL_MATERIAL_KEY,
+  resolveMaterialLighting,
+} from '../materials/wallMaterials'
 import { ApartmentTemplate } from './ApartmentTemplate'
 import { ROOM_DEPTH, ROOM_WIDTH } from '../constants/roomDimensions'
 import { RoomLights } from './RoomLights'
+
+/** Matches tone mapping to loaded PBR presets; Three.js exposes this only imperatively on WebGLRenderer. */
+function MaterialToneExposure({ exposure }) {
+  const { gl } = useThree()
+  useEffect(() => {
+    gl.toneMappingExposure = exposure
+  }, [exposure, gl])
+  return null
+}
 
 const SCENE_STYLING = {
   wallColor: '#f2ece3',
@@ -23,14 +43,49 @@ const SECOND_PLACE_STYLING = {
 const EYE_HEIGHT = 1.62
 const MOVE_SPEED = 2.2
 const ROOM_MARGIN = 0.36
-const DOOR_RADIUS = 1.35
-const DOOR_POINTS = [
-  new THREE.Vector3(1.55, EYE_HEIGHT, ROOM_DEPTH / 2 - 0.48),
-  new THREE.Vector3(0, EYE_HEIGHT, ROOM_DEPTH / 2 - 0.45),
-  new THREE.Vector3(-1.55, EYE_HEIGHT, ROOM_DEPTH / 2 - 0.48),
-]
 
-function WalkAndInspectControls({ onDoorProximityChange, onDoorInteract, place }) {
+function OutsideView({ place }) {
+  const isSecondPlace = place === 'building2'
+  const skyTop = isSecondPlace ? '#bcd7f2' : '#5572a2'
+  const skyBottom = isSecondPlace ? '#dbe7f5' : '#95aac9'
+
+  const specs = useMemo(
+    () => {
+      const buildingPalette = isSecondPlace ?
+          ['#617383', '#4f6070', '#748899', '#5a6f80']
+        : ['#2f3440', '#252a33', '#3a414f', '#2a303a']
+      return [
+        { p: [-2.7, 1.15, ROOM_DEPTH / 2 + 3.6], s: [0.9, 2.2, 0.9], c: buildingPalette[0] },
+        { p: [-1.65, 1.35, ROOM_DEPTH / 2 + 4.2], s: [1.1, 2.7, 1], c: buildingPalette[1] },
+        { p: [-0.35, 0.95, ROOM_DEPTH / 2 + 3.2], s: [1, 1.9, 1], c: buildingPalette[2] },
+        { p: [0.95, 1.4, ROOM_DEPTH / 2 + 4.6], s: [1.25, 2.8, 1], c: buildingPalette[3] },
+        { p: [2.25, 1.1, ROOM_DEPTH / 2 + 3.7], s: [1, 2.1, 1], c: buildingPalette[0] },
+      ]
+    },
+    [isSecondPlace],
+  )
+
+  return (
+    <group>
+      <mesh position={[0, 1.6, ROOM_DEPTH / 2 + 6.8]} renderOrder={-1}>
+        <planeGeometry args={[16, 9]} />
+        <meshBasicMaterial color={skyTop} fog={false} />
+      </mesh>
+      <mesh position={[0, -0.45, ROOM_DEPTH / 2 + 6.2]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={-1}>
+        <planeGeometry args={[18, 18]} />
+        <meshBasicMaterial color={skyBottom} fog={false} />
+      </mesh>
+      {specs.map((spec, idx) => (
+        <mesh key={idx} position={spec.p}>
+          <boxGeometry args={spec.s} />
+          <meshStandardMaterial color={spec.c} roughness={0.9} metalness={0} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+function WalkAndInspectControls({ place }) {
   const { camera, scene, gl } = useThree()
   const [, getKeys] = useKeyboardControls()
   const orbitRef = useRef(null)
@@ -53,15 +108,25 @@ function WalkAndInspectControls({ onDoorProximityChange, onDoorInteract, place }
     [],
   )
   const transitionRef = useRef(null)
-  const nearDoorRef = useRef(false)
-  const interactPressedRef = useRef(false)
 
   useEffect(() => {
     const controls = lockRef.current
     if (!controls) return undefined
 
     const onLock = () => setIsLocked(true)
-    const onUnlock = () => setIsLocked(false)
+    const onUnlock = () => {
+      // Keep camera exactly where FPS mode ended, then sync orbit target in front.
+      setIsLocked(false)
+      transitionRef.current = null
+      if (!orbitRef.current) return
+
+      camera.getWorldDirection(tmpForward)
+      if (tmpForward.lengthSq() < 0.0001) tmpForward.set(0, 0, -1)
+      tmpForward.normalize()
+      const safeTarget = camera.position.clone().addScaledVector(tmpForward, 1.1)
+      orbitRef.current.target.copy(safeTarget)
+      orbitRef.current.update()
+    }
     controls.addEventListener('lock', onLock)
     controls.addEventListener('unlock', onUnlock)
 
@@ -69,7 +134,7 @@ function WalkAndInspectControls({ onDoorProximityChange, onDoorInteract, place }
       controls.removeEventListener('lock', onLock)
       controls.removeEventListener('unlock', onUnlock)
     }
-  }, [])
+  }, [camera, tmpForward])
 
   useEffect(() => {
     const onDoubleClick = (event) => {
@@ -119,17 +184,11 @@ function WalkAndInspectControls({ onDoorProximityChange, onDoorInteract, place }
     orbitRef.current?.update()
   }, [camera, place])
 
-  useEffect(() => () => onDoorProximityChange?.(false), [onDoorProximityChange])
-
   useFrame((_, delta) => {
-    const isNearDoor = DOOR_POINTS.some((doorPoint) => {
-      const dx = camera.position.x - doorPoint.x
-      const dz = camera.position.z - doorPoint.z
-      return Math.hypot(dx, dz) <= DOOR_RADIUS
-    })
-    if (isNearDoor !== nearDoorRef.current) {
-      nearDoorRef.current = isNearDoor
-      onDoorProximityChange?.(isNearDoor)
+    const clampCameraToInterior = () => {
+      camera.position.x = THREE.MathUtils.clamp(camera.position.x, bounds.minX, bounds.maxX)
+      camera.position.z = THREE.MathUtils.clamp(camera.position.z, bounds.minZ, bounds.maxZ)
+      camera.position.y = Math.max(EYE_HEIGHT, camera.position.y)
     }
 
     if (!isLocked) {
@@ -148,14 +207,11 @@ function WalkAndInspectControls({ onDoorProximityChange, onDoorInteract, place }
       } else if (orbitRef.current) {
         orbitRef.current.update()
       }
+      clampCameraToInterior()
       return
     }
 
-    const { forward, backward, left, right, run, interact } = getKeys()
-    if (interact && !interactPressedRef.current && nearDoorRef.current) {
-      onDoorInteract?.()
-    }
-    interactPressedRef.current = interact
+    const { forward, backward, left, right, run } = getKeys()
 
     tmpMove.set(0, 0, 0)
     if (forward) tmpMove.z -= 1
@@ -174,8 +230,7 @@ function WalkAndInspectControls({ onDoorProximityChange, onDoorInteract, place }
 
     camera.position.addScaledVector(tmpForward, -tmpMove.z * speed * delta)
     camera.position.addScaledVector(tmpRight, tmpMove.x * speed * delta)
-    camera.position.x = THREE.MathUtils.clamp(camera.position.x, bounds.minX, bounds.maxX)
-    camera.position.z = THREE.MathUtils.clamp(camera.position.z, bounds.minZ, bounds.maxZ)
+    clampCameraToInterior()
     camera.position.y = EYE_HEIGHT
   })
 
@@ -198,16 +253,33 @@ function WalkAndInspectControls({ onDoorProximityChange, onDoorInteract, place }
   )
 }
 
-export function Scene({ place = 'home', onDoorProximityChange, onDoorInteract }) {
+export function Scene({
+  place = 'home',
+  wallMaterialKey = DEFAULT_WALL_MATERIAL_KEY,
+  floorMaterialKey = DEFAULT_FLOOR_MATERIAL_KEY,
+  templateVariant = 'night',
+}) {
   const sceneStyling = place === 'home' ? SCENE_STYLING : SECOND_PLACE_STYLING
   const isSecondPlace = place === 'building2'
 
+  const materialLighting = useMemo(
+    () => resolveMaterialLighting(wallMaterialKey, floorMaterialKey, FLOOR_PRESETS),
+    [wallMaterialKey, floorMaterialKey],
+  )
+
   return (
     <>
+      <MaterialToneExposure exposure={materialLighting.exposure} />
       <color attach="background" args={[isSecondPlace ? '#edf5ff' : '#d9dde4']} />
       <fog attach="fog" args={[isSecondPlace ? '#edf5ff' : '#d9dde4', 9, 24]} />
-      <RoomLights place={place} />
-      <ApartmentTemplate {...sceneStyling} />
+      <RoomLights place={place} mainLightIntensityFactor={materialLighting.intensityFactor} />
+      <OutsideView place={place} />
+      <ApartmentTemplate
+        {...sceneStyling}
+        wallMaterialKey={wallMaterialKey}
+        floorMaterialKey={floorMaterialKey}
+        templateVariant={templateVariant}
+      />
       <group position={[0, 0.94, ROOM_DEPTH / 2 - 0.03]}>
         <mesh>
           <planeGeometry args={[0.95, 1.85]} />
@@ -224,11 +296,7 @@ export function Scene({ place = 'home', onDoorProximityChange, onDoorInteract })
           <meshBasicMaterial color="#b4ecff" transparent opacity={0.92} />
         </mesh>
       </group>
-      <WalkAndInspectControls
-        onDoorProximityChange={onDoorProximityChange}
-        onDoorInteract={onDoorInteract}
-        place={place}
-      />
+      <WalkAndInspectControls place={place} />
     </>
   )
 }
